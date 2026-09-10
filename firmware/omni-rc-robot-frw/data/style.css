@@ -1,0 +1,259 @@
+/* =========================================================================
+   Omni-RC-Robot - interface Web embarquee
+   CSS autonome : aucune police ni feuille de style externe, l'interface
+   doit fonctionner sans acces Internet.
+   ========================================================================= */
+
+:root {
+  --bg:        #11141a;
+  --surface:   #1a1f29;
+  --surface-2: #232a36;
+  --border:    #2f3846;
+  --text:      #e7eaf0;
+  --text-dim:  #97a1b3;
+  --accent:    #4f9bff;
+  --ok:        #35c98a;
+  --warn:      #f0b23c;
+  --danger:    #ef5f5f;
+  --radius:    10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  padding-bottom: 78px;
+}
+
+/* ---------------------------------------------------------------- entete */
+
+.app-header {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; gap: .75rem;
+  align-items: center; justify-content: space-between;
+  padding: .7rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.title { display: flex; align-items: center; gap: .6rem; }
+.app-header h1 { margin: 0; font-size: 1.05rem; letter-spacing: .02em; }
+.header-actions { display: flex; align-items: center; gap: .6rem; }
+
+.state-badge {
+  font-weight: 700; font-size: .82rem; letter-spacing: .06em;
+  padding: .35rem .7rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.state-armed     { background: #123a29; border-color: var(--ok);     color: var(--ok); }
+.state-disarmed  { background: #1b2740; border-color: var(--accent); color: var(--accent); }
+.state-failsafe  { background: #3b1a1a; border-color: var(--danger); color: var(--danger); }
+.state-motortest { background: #3a2e12; border-color: var(--warn);   color: var(--warn); }
+
+.pill {
+  font-size: .74rem; padding: .2rem .55rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim);
+}
+.pill-ok   { color: var(--ok);     border-color: var(--ok); }
+.pill-warn { color: var(--warn);   border-color: var(--warn); }
+.pill-bad  { color: var(--danger); border-color: var(--danger); }
+
+/* --------------------------------------------------------------- onglets */
+
+.tabs {
+  display: flex; gap: .3rem; overflow-x: auto;
+  padding: .5rem 1rem; background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  -webkit-overflow-scrolling: touch;
+}
+.tab {
+  flex: 0 0 auto;
+  background: transparent; color: var(--text-dim);
+  border: 1px solid transparent; border-radius: var(--radius);
+  padding: .4rem .75rem; font-size: .86rem; cursor: pointer;
+  font-family: inherit;
+}
+.tab:hover { color: var(--text); }
+.tab-active { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+
+/* ---------------------------------------------------------------- pages */
+
+main { padding: 1rem; max-width: 1180px; margin: 0 auto; }
+.panel { display: none; }
+.panel-active { display: block; }
+
+.grid {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.card h2 { margin: 0 0 .75rem; font-size: .95rem; color: var(--text); }
+.card-warning { border-color: var(--warn); }
+
+.hint { color: var(--text-dim); font-size: .84rem; margin: .25rem 0 .75rem; }
+
+/* ------------------------------------------------------------- affichage */
+
+.readout { display: grid; grid-template-columns: 1fr auto; gap: .3rem .8rem; margin: 0; }
+.readout dt { color: var(--text-dim); font-size: .84rem; }
+.readout dd { margin: 0; font-variant-numeric: tabular-nums; font-size: .88rem; }
+.value-ok  { color: var(--ok); }
+.value-bad { color: var(--danger); }
+
+.gauge-row { display: grid; grid-template-columns: 2rem 1fr 3.4rem; align-items: center; gap: .6rem; margin-bottom: .5rem; }
+.gauge-row label { color: var(--text-dim); font-size: .86rem; }
+.gauge-row output { text-align: right; font-variant-numeric: tabular-nums; font-size: .85rem; }
+.gauge {
+  position: relative; height: 9px; border-radius: 999px;
+  background: var(--surface-2); overflow: hidden;
+}
+/* Repere central de la jauge : les valeurs sont signees, le zero est au milieu. */
+.gauge::after {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+  width: 1px; background: var(--border);
+}
+.gauge span {
+  position: absolute; top: 0; bottom: 0; left: 50%; width: 0;
+  background: var(--accent); border-radius: 999px;
+}
+
+.table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.table th, .table td { padding: .4rem .5rem; text-align: right; border-bottom: 1px solid var(--border); }
+.table th:first-child, .table td:first-child { text-align: left; }
+.table th { color: var(--text-dim); font-weight: 500; }
+.table td { font-variant-numeric: tabular-nums; }
+
+.channel-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: .4rem; }
+.channel {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: .3rem .5rem; font-size: .8rem;
+  display: flex; justify-content: space-between;
+}
+.channel span:first-child { color: var(--text-dim); }
+.channel-used { border-color: var(--accent); }
+
+/* ------------------------------------------------------------ vue robot */
+
+.robot-view { width: 100%; max-width: 300px; display: block; margin: 0 auto; }
+.chassis { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.wheel   { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.svg-label { fill: var(--text-dim); font-size: 9px; text-anchor: middle; }
+.svg-motor { fill: var(--text-dim); font-size: 9px; text-anchor: middle; }
+.drive-vector { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
+.robot-center { fill: var(--text-dim); }
+.rotation-arc { fill: none; stroke: var(--warn); stroke-linecap: round; }
+
+/* -------------------------------------------------------------- champs */
+
+.field-grid { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+label { display: block; font-size: .82rem; color: var(--text-dim); }
+input, select {
+  width: 100%; margin-top: .25rem; padding: .45rem .55rem;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 7px;
+  font-family: inherit; font-size: .9rem;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+label.checkbox { display: flex; align-items: center; gap: .5rem; color: var(--text); }
+label.checkbox input { width: auto; margin: 0; }
+
+.editor { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem; }
+.editor h3 { margin: 0 0 .6rem; font-size: .86rem; }
+.editor .live { float: right; font-size: .78rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* -------------------------------------------------------------- boutons */
+
+.button {
+  padding: .5rem .85rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-size: .85rem; font-family: inherit; cursor: pointer;
+}
+.button:hover:not(:disabled) { border-color: var(--accent); }
+.button:disabled { opacity: .45; cursor: not-allowed; }
+.button-primary { background: var(--accent); border-color: var(--accent); color: #06101f; font-weight: 600; }
+.button-danger  { background: #3b1a1a; border-color: var(--danger); color: var(--danger); font-weight: 600; }
+.button-ghost   { background: transparent; }
+
+.wizard { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
+.wizard-status { color: var(--text-dim); font-size: .83rem; margin: .4rem 0 0; }
+
+.motor-test-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: .8rem; }
+.motor-test-row { display: flex; align-items: center; gap: .5rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem .7rem; }
+.motor-test-row strong { min-width: 2rem; }
+.motor-test-row .button { flex: 1; }
+
+/* -------------------------------------------------------------- journal */
+
+.checklist { list-style: none; margin: 0; padding: 0; }
+.checklist li {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .22rem 0; font-size: .85rem;
+}
+.checklist .mark { width: 1.1rem; text-align: center; font-weight: 700; }
+.checklist .ok   { color: var(--ok); }
+.checklist .bad  { color: var(--danger); }
+.checklist .wait { color: var(--warn); }
+
+.raw-dump {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: .72rem; color: var(--text-dim); word-break: break-all;
+  background: #0c0f14; border: 1px solid var(--border);
+  border-radius: 6px; padding: .4rem .5rem;
+}
+
+.log-view {
+  max-height: 340px; overflow-y: auto;
+  background: #0c0f14; border: 1px solid var(--border); border-radius: 8px;
+  padding: .6rem; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: .76rem; line-height: 1.55;
+}
+.log-line { white-space: pre-wrap; word-break: break-word; }
+.log-ERROR { color: var(--danger); }
+.log-WARN  { color: var(--warn); }
+.log-INFO  { color: var(--text); }
+.log-DEBUG, .log-TRACE { color: var(--text-dim); }
+
+/* ------------------------------------------------------------ barre bas */
+
+.action-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: flex-end; gap: .6rem;
+  padding: .7rem 1rem;
+  padding-bottom: calc(.7rem + env(safe-area-inset-bottom));
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.toast { margin-right: auto; font-size: .82rem; color: var(--text-dim); }
+
+.unsaved-banner {
+  margin-right: auto;
+  font-size: .8rem; font-weight: 600;
+  color: #06101f; background: var(--warn);
+  padding: .35rem .7rem; border-radius: var(--radius);
+}
+/* Le bouton Enregistrer pulse tant que des reglages ne sont pas en NVS. */
+.button-attention {
+  background: var(--warn); border-color: var(--warn); color: #06101f;
+  animation: unsaved-pulse 1.6s ease-in-out infinite;
+}
+@keyframes unsaved-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .62; }
+}
+.toast-ok  { color: var(--ok); }
+.toast-bad { color: var(--danger); }
+
+@media (max-width: 560px) {
+  .app-header h1 { font-size: .95rem; }
+  main { padding: .75rem; }
+}

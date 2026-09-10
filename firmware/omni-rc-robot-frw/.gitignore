@@ -1,0 +1,15 @@
+# Build PlatformIO
+.pio/
+
+# Fichiers VSCode generes par PlatformIO : ils contiennent des chemins absolus
+# propres a la machine. extensions.json reste suivi, il est portable et utile.
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
+.vscode/.browse.c_cpp.db*
+
+# SECRET : identifiants Wi-Fi reels. Modele suivi par Git : include/wifi_secrets.example.h
+include/wifi_secrets.h
+
+# Exports de configuration (peuvent contenir un mot de passe Wi-Fi)
+robot-config*.json

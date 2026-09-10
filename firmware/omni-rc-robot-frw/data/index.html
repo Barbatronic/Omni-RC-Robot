@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Omni-RC-Robot</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="title">
+    <h1>Omni-RC-Robot</h1>
+    <span id="link-state" class="pill pill-muted">connexion...</span>
+  </div>
+  <div class="header-actions">
+    <span id="robot-state" class="state-badge state-boot">BOOT</span>
+    <button id="disarm-button" class="button button-danger">DESARMER</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab tab-active" data-panel="dashboard">Tableau de bord</button>
+  <button class="tab" data-panel="radio">Radio</button>
+  <button class="tab" data-panel="geometry">Geometrie</button>
+  <button class="tab" data-panel="drive">Conduite</button>
+  <button class="tab" data-panel="motors">Moteurs</button>
+  <button class="tab" data-panel="network">Reseau</button>
+  <button class="tab" data-panel="system">Systeme</button>
+</nav>
+
+<main>
+
+<!-- ===================== TABLEAU DE BORD ===================== -->
+<section id="panel-dashboard" class="panel panel-active">
+
+  <div class="grid">
+    <div class="card">
+      <h2>Radio</h2>
+      <dl class="readout">
+        <dt>Protocole</dt>     <dd id="radio-protocol" class="value">-</dd>
+        <dt>Liaison</dt>       <dd id="sbus-connected" class="value">-</dd>
+        <dt>Failsafe</dt>      <dd id="sbus-failsafe" class="value">-</dd>
+        <dt>Trame perdue</dt>  <dd id="sbus-framelost" class="value">-</dd>
+        <dt>Cadence</dt>       <dd id="sbus-rate" class="value">-</dd>
+        <dt>Age derniere trame</dt><dd id="sbus-age" class="value">-</dd>
+        <dt>Trames valides</dt><dd id="sbus-frames" class="value">-</dd>
+      </dl>
+      <p class="hint" style="margin-top:.6rem">Octets bruts recus (diagnostic cablage) :</p>
+      <div id="radio-rawbytes" class="raw-dump">-</div>
+    </div>
+
+    <div class="card">
+      <h2>Armement</h2>
+      <p class="hint">L'armement se fait <strong>uniquement depuis la radiocommande</strong>.
+         L'interface ne peut que desarmer : elle n'a volontairement aucun bouton pour armer.</p>
+      <ul id="arming-checklist" class="checklist"></ul>
+      <p id="arming-summary" class="wizard-status">-</p>
+    </div>
+
+    <div class="card">
+      <h2>Commandes</h2>
+      <div class="gauge-row"><label>vx</label><div class="gauge"><span id="gauge-vx"></span></div><output id="value-vx">0.00</output></div>
+      <div class="gauge-row"><label>vy</label><div class="gauge"><span id="gauge-vy"></span></div><output id="value-vy">0.00</output></div>
+      <div class="gauge-row"><label>&omega;</label><div class="gauge"><span id="gauge-omega"></span></div><output id="value-omega">0.00</output></div>
+      <dl class="readout">
+        <dt>Interrupteur armement</dt><dd id="arm-switch" class="value">-</dd>
+        <dt>Mode</dt><dd id="speed-mode" class="value">-</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Vue de dessus</h2>
+      <!-- Representation SVG du robot : roues, vecteur de translation, rotation -->
+      <svg id="robot-view" viewBox="0 0 220 220" class="robot-view">
+        <defs>
+          <marker id="arrow-head" viewBox="0 0 10 10" refX="8" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+          </marker>
+          <!-- Pointe orientee le long de l'arc, elle indique le sens de rotation. -->
+          <marker id="rotation-arrow-head" viewBox="0 0 10 10" refX="7" refY="5"
+                  markerWidth="4.5" markerHeight="4.5" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--warn)"/>
+          </marker>
+        </defs>
+        <rect x="45" y="45" width="130" height="130" rx="12" class="chassis"/>
+        <text x="110" y="26" class="svg-label">AVANT</text>
+
+        <g id="wheel-0"><rect x="34" y="52" width="26" height="42" rx="6" class="wheel"/><text x="47" y="78" class="svg-motor">M0</text></g>
+        <g id="wheel-1"><rect x="160" y="52" width="26" height="42" rx="6" class="wheel"/><text x="173" y="78" class="svg-motor">M1</text></g>
+        <g id="wheel-2"><rect x="160" y="126" width="26" height="42" rx="6" class="wheel"/><text x="173" y="152" class="svg-motor">M2</text></g>
+        <g id="wheel-3"><rect x="34" y="126" width="26" height="42" rx="6" class="wheel"/><text x="47" y="152" class="svg-motor">M3</text></g>
+
+        <!-- Deux arcs opposes formant un symbole de rotation. Leur sens suit
+             le signe d'omega : antihoraire si positif, horaire si negatif. -->
+        <g id="rotation-indicator">
+          <path id="rotation-arc-top" class="rotation-arc" marker-end="url(#rotation-arrow-head)"/>
+          <path id="rotation-arc-bottom" class="rotation-arc" marker-end="url(#rotation-arrow-head)"/>
+        </g>
+        <line id="drive-vector" x1="110" y1="110" x2="110" y2="110"
+              class="drive-vector" marker-end="url(#arrow-head)"/>
+        <circle cx="110" cy="110" r="3" class="robot-center"/>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h2>Moteurs</h2>
+      <table class="table">
+        <thead><tr><th>Moteur</th><th>Mixer</th><th>Applique</th><th>Sens</th><th>PWM</th></tr></thead>
+        <tbody id="motor-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Voies SBUS brutes</h2>
+    <div id="channel-list" class="channel-list"></div>
+  </div>
+</section>
+
+<!-- ===================== RADIO ===================== -->
+<section id="panel-radio" class="panel">
+  <div class="card">
+    <h2>Assistant de calibration</h2>
+    <p class="hint">Identifie automatiquement le minimum, le centre et le maximum des trois axes.
+       La validation reste manuelle : rien n'est applique sans votre confirmation.</p>
+    <div class="wizard">
+      <button id="wizard-center" class="button">1. Manches au centre</button>
+      <button id="wizard-sweep" class="button">2. Balayer les extremes</button>
+      <button id="wizard-apply" class="button button-primary" disabled>3. Appliquer</button>
+      <button id="wizard-cancel" class="button button-ghost">Annuler</button>
+    </div>
+    <p id="wizard-status" class="wizard-status">Assistant a l'arret.</p>
+  </div>
+
+  <div class="card">
+    <h2>Voies brutes en direct</h2>
+    <p class="hint">Bougez un manche ou un interrupteur : la voie qui reagit est celle a
+       renseigner ci-dessous. Les voies deja affectees sont encadrees en bleu.</p>
+    <div id="channel-list-radio" class="channel-list"></div>
+  </div>
+
+  <div class="card">
+    <h2>Axes de pilotage</h2>
+    <div id="axis-editors" class="grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Voies de commutation</h2>
+    <div class="field-grid">
+      <label>Voie d'armement (CH1 a CH16)<input type="number" min="1" max="16" data-offset="1" data-config="radio.armChannel"></label>
+      <label>Seuil d'armement<input type="number" min="0" max="2047" data-config="radio.armThreshold"></label>
+      <label class="checkbox"><input type="checkbox" data-config="radio.armInverted"><span>Inverser l'armement</span></label>
+      <label>Voie mode de vitesse (0 : aucune)<input type="number" min="0" max="16" data-offset="1" data-config="radio.speedModeChannel"></label>
+      <label>Seuil mode de vitesse<input type="number" min="0" max="2047" data-config="radio.speedModeThreshold"></label>
+      <label>Timeout radio (ms)<input type="number" min="50" max="2000" data-config="radio.frameTimeoutMs"></label>
+      <label>Protocole du recepteur
+        <select data-config="radio.protocol">
+          <option value="sbus">SBUS (Futaba, FrSky)</option>
+          <option value="ibus">iBUS (FlySky FS-iA6B...)</option>
+        </select>
+      </label>
+      <label class="checkbox"><input type="checkbox" data-config="radio.autoDetectProtocol"><span>Reconnaitre le protocole au demarrage</span></label>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== GEOMETRIE ===================== -->
+<section id="panel-geometry" class="panel">
+  <div class="card">
+    <h2>Presets de geometrie</h2>
+    <p class="hint">Le preset ne fait que pre-remplir les angles : chaque roue reste modifiable a la main ensuite.</p>
+    <div class="wizard">
+      <button class="button preset-button" data-angle="45">X-drive 45&deg;</button>
+      <button class="button preset-button" data-angle="60">Geometrie 60&deg;</button>
+      <button class="button preset-button" data-angle="30">Geometrie 30&deg;</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Roues</h2>
+    <p class="hint">Angle mesure dans le sens antihoraire depuis l'axe +X (droite). 90&deg; pointe vers l'avant.</p>
+    <div id="wheel-editors" class="grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Simulateur de mixer</h2>
+    <p class="hint">Calcule les sorties theoriques sans commander aucun moteur.</p>
+    <div class="wizard">
+      <button class="button sim-button" data-vx="0"  data-vy="1"  data-omega="0">Avant</button>
+      <button class="button sim-button" data-vx="0"  data-vy="-1" data-omega="0">Arriere</button>
+      <button class="button sim-button" data-vx="-1" data-vy="0"  data-omega="0">Gauche</button>
+      <button class="button sim-button" data-vx="1"  data-vy="0"  data-omega="0">Droite</button>
+      <button class="button sim-button" data-vx="0.7" data-vy="0.7" data-omega="0">Diagonale AV-D</button>
+      <button class="button sim-button" data-vx="-0.7" data-vy="0.7" data-omega="0">Diagonale AV-G</button>
+      <button class="button sim-button" data-vx="0" data-vy="0" data-omega="1">Rotation gauche</button>
+      <button class="button sim-button" data-vx="0" data-vy="0" data-omega="-1">Rotation droite</button>
+      <button class="button sim-button" data-vx="0" data-vy="0" data-omega="0">Stop</button>
+    </div>
+    <table class="table">
+      <thead><tr><th>M0</th><th>M1</th><th>M2</th><th>M3</th></tr></thead>
+      <tbody><tr id="simulation-row"><td>-</td><td>-</td><td>-</td><td>-</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== CONDUITE ===================== -->
+<section id="panel-drive" class="panel">
+  <div class="card">
+    <h2>Limites de puissance et de dynamique</h2>
+    <div class="field-grid">
+      <label>Puissance moteur maximale<input type="number" step="0.01" min="0" max="1" data-config="drive.maxMotorOutput"></label>
+      <label>Seuil de demarrage moteur (0 = desactive)<input type="number" step="0.01" min="0" max="0.5" data-config="drive.minMotorOutput"></label>
+      <label class="checkbox"><input type="checkbox" data-config="drive.normalizeTranslation"><span>Exploiter toute la puissance dans chaque direction</span></label>
+      <label>Limite translation<input type="number" step="0.01" min="0" max="1" data-config="drive.maxTranslationOutput"></label>
+      <label>Limite rotation<input type="number" step="0.01" min="0" max="1" data-config="drive.maxRotationOutput"></label>
+      <label>Facteur mode lent<input type="number" step="0.01" min="0.05" max="1" data-config="drive.slowModeScale"></label>
+      <label>Acceleration max (par seconde)<input type="number" step="0.1" min="0" max="50" data-config="drive.maxAcceleration"></label>
+      <label>Deceleration max (par seconde)<input type="number" step="0.1" min="0" max="50" data-config="drive.maxDeceleration"></label>
+      <label>Frequence PWM (Hz)<input type="number" min="500" max="40000" data-config="drive.pwmFrequencyHz"></label>
+      <label>Resolution PWM (bits)<input type="number" min="8" max="14" data-config="drive.pwmResolutionBits"></label>
+    </div>
+    <p class="hint">La geometrie omnidirectionnelle fait qu'une commande de translation ne
+       sollicite pas les moteurs de la meme facon selon sa direction : avec des roues a 60&deg;,
+       une marche avant n'utilise que <strong>50 %</strong> de la capacite moteur, contre 87 %
+       en lateral et 100 % en rotation. L'option <strong>Exploiter toute la puissance</strong>
+       applique un facteur de rattrapage calcule sur la <em>direction</em> demandee, jamais sur
+       son amplitude : plein manche donne la pleine echelle partout, et un petit mouvement de
+       manche reste un petit mouvement.</p>
+    <p class="hint">Le <strong>seuil de demarrage</strong> compense le frottement statique des
+       moteurs : en dessous d'un certain rapport cyclique un moteur a reducteur bourdonne sans
+       tourner. Toute commande non nulle est remontee a cette valeur, la pleine echelle et la
+       puissance maximale restant inchangees. Pour trouver la bonne valeur, utilisez le test
+       moteur en baissant sa puissance jusqu'a ce que la roue cesse de tourner.</p>
+    <p class="hint">La <strong>frequence PWM</strong> est appliquee immediatement, moteurs coupes
+       le temps de la reconfiguration. Les drivers BTS7960 commutent lentement : au-dela d'une
+       dizaine de kilohertz, une part croissante de chaque periode est perdue en commutation,
+       le couple chute et le module chauffe. Si les moteurs manquent de puissance, essayer
+       <strong>8000 a 10000 Hz</strong> avant de conclure a un probleme mecanique.</p>
+  </div>
+
+  <div class="card">
+    <h2>Securite</h2>
+    <div class="field-grid">
+      <label>Maintien avant armement (ms)<input type="number" min="0" max="5000" data-config="safety.armingHoldMs"></label>
+      <label>Tolerance neutre<input type="number" step="0.01" min="0.01" max="0.5" data-config="safety.armingNeutralTolerance"></label>
+      <label>Puissance test moteur<input type="number" step="0.01" min="0" max="0.5" data-config="safety.motorTestMaxOutput"></label>
+      <label>Timeout test moteur (ms)<input type="number" min="200" max="10000" data-config="safety.motorTestTimeoutMs"></label>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MOTEURS ===================== -->
+<section id="panel-motors" class="panel">
+  <div class="card card-warning">
+    <h2>Test moteur</h2>
+    <p><strong>Le robot doit etre DESARME et les roues levees.</strong>
+       Le test s'arrete des que le bouton est relache, en cas de perte de la
+       connexion Web, ou si l'armement est demande a la radiocommande.</p>
+    <label class="checkbox">
+      <input type="checkbox" id="motor-test-confirm">
+      <span>Je confirme que les roues sont levees et le robot desarme</span>
+    </label>
+    <div id="motor-test-controls" class="motor-test-grid"></div>
+    <p id="motor-test-status" class="wizard-status">Test moteur inactif.</p>
+  </div>
+</section>
+
+<!-- ===================== RESEAU ===================== -->
+<section id="panel-network" class="panel">
+  <div class="card">
+    <h2>Wi-Fi</h2>
+    <p class="hint">Les mots de passe ne sont jamais renvoyes par le robot : le champ
+       affiche des etoiles si un mot de passe est deja enregistre. Le laisser tel quel
+       le conserve, l'effacer et saisir une nouvelle valeur le remplace.</p>
+    <div class="field-grid">
+      <label>Mode
+        <select data-config="wifi.mode">
+          <option value="ap">Point d'acces du robot</option>
+          <option value="station">Rejoindre un reseau existant</option>
+        </select>
+      </label>
+      <label>SSID du point d'acces (vide : automatique)<input type="text" maxlength="32" data-config="wifi.apSsid"></label>
+      <label>Mot de passe du point d'acces<input type="password" maxlength="64" data-config="wifi.apPassword"></label>
+      <label>SSID du reseau a rejoindre<input type="text" maxlength="32" data-config="wifi.stationSsid"></label>
+      <label>Mot de passe du reseau<input type="password" maxlength="64" data-config="wifi.stationPassword"></label>
+      <label>Delai de connexion (ms)<input type="number" min="3000" max="60000" data-config="wifi.connectTimeoutMs"></label>
+    </div>
+    <p class="hint">Le changement de reseau prend effet au redemarrage. En cas d'echec de
+       connexion, le robot recree automatiquement son point d'acces.</p>
+  </div>
+</section>
+
+<!-- ===================== SYSTEME ===================== -->
+<section id="panel-system" class="panel">
+  <div class="card">
+    <h2>Diagnostic</h2>
+    <dl class="readout" id="system-readout"></dl>
+    <div class="wizard">
+      <button id="export-button" class="button">Exporter la configuration</button>
+      <button id="import-button" class="button">Importer une configuration</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <button id="reset-button" class="button button-danger">Valeurs par defaut</button>
+      <button id="reboot-button" class="button button-danger">Redemarrer le robot</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Journal</h2>
+    <div id="log-view" class="log-view"></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="action-bar">
+  <span id="unsaved-marker" class="unsaved-banner" hidden>
+    Modifications NON ENREGISTREES &mdash; elles seront perdues au prochain redemarrage
+  </span>
+  <span id="toast" class="toast"></span>
+  <button id="apply-button" class="button">Appliquer</button>
+  <button id="save-button" class="button button-primary">Enregistrer</button>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
