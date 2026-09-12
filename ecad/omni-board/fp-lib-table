@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "omni-footprints")(type "KiCad")(uri "${KIPRJMOD}/../lib/omni-footprints.pretty")(options "")(descr "Empreintes maison Omni-RC-Robot"))
+)

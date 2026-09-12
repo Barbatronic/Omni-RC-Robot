@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "omni-symbols")(type "KiCad")(uri "${KIPRJMOD}/../lib/omni-symbols.kicad_sym")(options "")(descr "Symboles maison Omni-RC-Robot"))
+)
