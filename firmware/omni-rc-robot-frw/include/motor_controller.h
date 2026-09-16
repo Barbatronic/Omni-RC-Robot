@@ -19,6 +19,13 @@
  *    utilisent tous : aucun autre module ne doit appeler ledcSetup().
  *
  *  - A l'arret, RPWM = LPWM = 0. Le moteur est alors en roue libre.
+ *
+ *  - Sur la carte definitive, les entrees Enable des quatre drivers sont
+ *    reliees a une broche unique munie d'une resistance de rappel au 0 V. Le
+ *    firmware ne la leve que lorsque les moteurs sont autorises : les ponts en
+ *    H sont donc coupes au niveau materiel des que le robot n'est ni arme ni en
+ *    test, et pendant tout le demarrage. C'est une securite independante de la
+ *    commande PWM, qui reste active meme si le logiciel se fige.
  */
 
 #include <Arduino.h>
@@ -65,7 +72,7 @@ public:
     uint32_t appliedDutyCycle() const { return lastAppliedDutyCycle; }
 
 private:
-    MotorPins pins                 = { -1, -1, -1, -1 };
+    MotorPins pins                 = { -1, -1 };
     uint8_t   rightPwmChannel      = 0;
     uint8_t   leftPwmChannel       = 0;
     uint32_t  maximumDutyCycle     = 0;
@@ -125,6 +132,17 @@ private:
 
     /// Configure les huit canaux PWM materiels pour la frequence demandee.
     void configurePwmChannels(const DriveConfiguration& drive);
+
+    /**
+     * @brief Autorise ou coupe les ponts en H au niveau materiel.
+     *
+     * Sans effet si la carte ne cable pas de broche de validation commune.
+     *
+     * @param isEnabled true pour autoriser les drivers a conduire.
+     */
+    void setPowerStageEnabled(bool isEnabled);
+
+    bool isPowerStageEnabled = false;
 
     Motor              motors[wheelCount];
     DriveConfiguration driveConfiguration{};

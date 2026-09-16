@@ -92,17 +92,6 @@ bool Motor::begin(const MotorPins& motorPins,
     // Les sorties sont mises a zero avant toute activation des drivers.
     stop();
 
-    // Les broches Enable ne sont pilotees que si elles sont reellement cablees
-    // a l'ESP32. Sinon elles sont maintenues actives par le montage.
-    if (pins.rightEnablePin >= 0) {
-        pinMode(pins.rightEnablePin, OUTPUT);
-        digitalWrite(pins.rightEnablePin, HIGH);
-    }
-    if (pins.leftEnablePin >= 0) {
-        pinMode(pins.leftEnablePin, OUTPUT);
-        digitalWrite(pins.leftEnablePin, HIGH);
-    }
-
     return isRightChannelReady && isLeftChannelReady;
 }
 
@@ -148,7 +137,28 @@ void Motor::stop()
 void MotorController::begin(const DriveConfiguration& drive)
 {
     driveConfiguration = drive;
+
+    // L'etage de puissance est explicitement coupe avant toute configuration
+    // PWM : rien ne doit pouvoir bouger pendant l'initialisation.
+    if (Pinout::motorEnablePin >= 0) {
+        pinMode(Pinout::motorEnablePin, OUTPUT);
+    }
+    isPowerStageEnabled = true;   // force le premier appel a ecrire l'etat bas
+    setPowerStageEnabled(false);
+
     configurePwmChannels(drive);
+}
+
+void MotorController::setPowerStageEnabled(bool isEnabled)
+{
+    if (Pinout::motorEnablePin < 0 || isEnabled == isPowerStageEnabled) {
+        return;
+    }
+
+    digitalWrite(Pinout::motorEnablePin, isEnabled ? HIGH : LOW);
+    isPowerStageEnabled = isEnabled;
+
+    LOG_INFO(logModule, "Etage de puissance %s", isEnabled ? "autorise" : "coupe");
 }
 
 void MotorController::configurePwmChannels(const DriveConfiguration& drive)
@@ -236,6 +246,9 @@ void MotorController::applyOutputs(const float (&targets)[wheelCount], float del
     // autoriser un saut de consigne arbitrairement grand.
     deltaTimeSeconds = constrain(deltaTimeSeconds, 0.0f, 0.1f);
 
+    // Les drivers sont autorises avant d'ecrire la premiere consigne non nulle.
+    setPowerStageEnabled(true);
+
     for (int motorIndex = 0; motorIndex < wheelCount; ++motorIndex) {
         currentOutputs[motorIndex] =
             applyRateLimit(currentOutputs[motorIndex], targets[motorIndex], deltaTimeSeconds);
@@ -249,6 +262,10 @@ void MotorController::stopAllMotors()
         currentOutputs[motorIndex] = 0.0f;
         motors[motorIndex].stop();
     }
+
+    // Coupure materielle en plus de la mise a zero du PWM : sur la carte
+    // definitive, les ponts en H cessent physiquement de conduire.
+    setPowerStageEnabled(false);
 }
 
 float MotorController::appliedOutput(int motorIndex) const
