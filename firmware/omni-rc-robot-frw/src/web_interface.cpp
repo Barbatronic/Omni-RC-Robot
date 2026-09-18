@@ -50,12 +50,39 @@ namespace
         sendJsonResponse(request, statusCode, document);
     }
 
+    /**
+     * @brief Verifie qu'un gestionnaire JSON n'a pas capte une sous-route.
+     *
+     * AsyncCallbackJsonWebHandler accepte toute URL commencant par son URI. Si
+     * une route plus specifique venait a etre enregistree apres lui, elle
+     * serait silencieusement avalee. Ce controle transforme cette erreur de
+     * declaration en refus explicite, plutot qu'en comportement incoherent.
+     *
+     * @param request Requete en cours.
+     * @param expectedUrl URL exacte que ce gestionnaire doit traiter.
+     * @return true si la requete doit etre traitee.
+     */
+    bool isExactRoute(AsyncWebServerRequest* request, const char* expectedUrl);
+
     void sendSuccessResponse(AsyncWebServerRequest* request, const String& message)
     {
         JsonDocument document;
         document["ok"]      = true;
         document["message"] = message;
         sendJsonResponse(request, 200, document);
+    }
+
+    bool isExactRoute(AsyncWebServerRequest* request, const char* expectedUrl)
+    {
+        if (request->url() == expectedUrl) {
+            return true;
+        }
+        LOG_ERROR(logModule,
+                  "Route %s captee par le gestionnaire de %s : une route specifique est "
+                  "declaree APRES un gestionnaire JSON qui la prefixe. Corriger l'ordre "
+                  "d'enregistrement dans registerRoutes().",
+                  request->url().c_str(), expectedUrl);
+        return false;
     }
 
     /// Page minimale servie lorsque l'interface n'a pas ete televersee en flash.
@@ -449,23 +476,23 @@ void WebInterface::registerRoutes()
         sendJsonResponse(request, 200, document);
     });
 
-    // --- Configuration : modification en RAM -------------------------------
-    auto* configHandler = new AsyncCallbackJsonWebHandler(
-        "/api/config",
-        [this](AsyncWebServerRequest* request, JsonVariant& json) {
-            String message;
-            if (!configManager->applyConfigurationFromJson(json.as<JsonObjectConst>(), message)) {
-                sendErrorResponse(request, 400, message);
-                return;
-            }
-            robotController->requestConfigurationReload();
-            sendSuccessResponse(request,
-                                message.isEmpty()
-                                    ? "Configuration appliquee. Utiliser Enregistrer pour la conserver."
-                                    : message);
-        });
-    configHandler->setMethod(HTTP_POST);
-    httpServer.addHandler(configHandler);
+    // ------------------------------------------------------------------------
+    // ORDRE D'ENREGISTREMENT SIGNIFICATIF
+    //
+    // AsyncCallbackJsonWebHandler accepte toute URL qui COMMENCE par son URI :
+    // un gestionnaire declare sur "/api/config" capte aussi "/api/config/save".
+    // Les gestionnaires etant essayes dans l'ordre d'enregistrement, les routes
+    // les plus specifiques doivent imperativement etre declarees EN PREMIER.
+    //
+    // Enregistrees apres, elles etaient avalees par le gestionnaire de mise a
+    // jour de configuration : l'enregistrement en memoire non volatile n'avait
+    // jamais lieu, et l'application d'un document vide marquait au passage la
+    // configuration comme modifiee. Le symptome cote utilisateur etait un
+    // reglage qui revenait au demarrage et un bandeau "non enregistre" fige.
+    //
+    // Le piege ne se voit qu'avec un en-tete Content-Type: application/json,
+    // que le navigateur envoie toujours mais pas un curl sans corps.
+    // ------------------------------------------------------------------------
 
     // --- Configuration : enregistrement en memoire non volatile ------------
     httpServer.on("/api/config/save", HTTP_POST, [this](AsyncWebServerRequest* request) {
@@ -483,6 +510,30 @@ void WebInterface::registerRoutes()
         sendSuccessResponse(request,
                             "Valeurs par defaut restaurees. Enregistrer pour les rendre permanentes.");
     });
+
+    // --- Configuration : modification en RAM -------------------------------
+    auto* configHandler = new AsyncCallbackJsonWebHandler(
+        "/api/config",
+        [this](AsyncWebServerRequest* request, JsonVariant& json) {
+            if (!isExactRoute(request, "/api/config")) {
+                sendErrorResponse(request, 404, "Route inconnue : " + request->url());
+                return;
+            }
+            String message;
+            if (!configManager->applyConfigurationFromJson(json.as<JsonObjectConst>(), message)) {
+                sendErrorResponse(request, 400, message);
+                return;
+            }
+            robotController->requestConfigurationReload();
+            sendSuccessResponse(request,
+                                message.isEmpty()
+                                    ? "Configuration appliquee. Utiliser Enregistrer pour la conserver."
+                                    : message);
+        });
+    configHandler->setMethod(HTTP_POST);
+    httpServer.addHandler(configHandler);
+
+
 
     // --- Journal -----------------------------------------------------------
     httpServer.on("/api/logs", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -508,12 +559,21 @@ void WebInterface::registerRoutes()
         sendJsonResponse(request, 200, document);
     });
 
+    httpServer.on("/api/motor-test/stop", HTTP_POST, [this](AsyncWebServerRequest* request) {
+        robotController->cancelMotorTest();
+        sendSuccessResponse(request, "Test moteur arrete");
+    });
+
     // --- Test moteur -------------------------------------------------------
     // Refuse par SafetyManager si le robot n'est pas DISARMED. La demande expire
     // d'elle-meme : l'interface doit la renouveler tant que le bouton est tenu.
     auto* motorTestHandler = new AsyncCallbackJsonWebHandler(
         "/api/motor-test",
         [this](AsyncWebServerRequest* request, JsonVariant& json) {
+            if (!isExactRoute(request, "/api/motor-test")) {
+                sendErrorResponse(request, 404, "Route inconnue : " + request->url());
+                return;
+            }
             JsonObjectConst body = json.as<JsonObjectConst>();
             if (body.isNull()) {
                 sendErrorResponse(request, 400, "Corps JSON attendu : {\"motor\":0,\"output\":0.2}");
@@ -533,10 +593,6 @@ void WebInterface::registerRoutes()
     motorTestHandler->setMethod(HTTP_POST);
     httpServer.addHandler(motorTestHandler);
 
-    httpServer.on("/api/motor-test/stop", HTTP_POST, [this](AsyncWebServerRequest* request) {
-        robotController->cancelMotorTest();
-        sendSuccessResponse(request, "Test moteur arrete");
-    });
 
     // --- Arret d'urgence depuis l'interface --------------------------------
     httpServer.on("/api/disarm", HTTP_POST, [this](AsyncWebServerRequest* request) {
